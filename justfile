@@ -34,3 +34,40 @@ upload: pack
     # Ensure that all changes have been committed
     test -z "$(git status --porcelain src/)"
     gnome-extensions upload --accept-tos dist/bilingual-app-search@pwa.lu.shell-extension.zip
+
+# Set up code completion in editors
+devenv-setup shell="latest":
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    # Start over, so that nothing is left from another shell version. Writing
+    # package.json keeps bun from using one in a parent directory.
+    rm -rf node_modules/ bun.lock
+    echo '{}' > package.json
+
+    # Imports the appropriate version of @girs/gjs as a transitive dependency
+    bun add --no-save "@girs/gnome-shell@{{shell}}"
+
+    # Declares the gi:// and resource:/// module paths
+    cat > ambient.d.ts <<'EOF'
+    import "@girs/gjs";
+    import "@girs/gjs/dom";
+    import "@girs/gnome-shell/ambient";
+    import "@girs/gnome-shell/extensions/global";
+    EOF
+
+    # Sets up code completion in editors that use the TypeScript language server
+    cat > jsconfig.json <<'EOF'
+    {
+      "compilerOptions": {
+        "module": "NodeNext",
+        "moduleResolution": "NodeNext",
+        "target": "ES2022",
+        "lib": ["ES2022"],
+        "checkJs": false,
+        "skipLibCheck": true
+      },
+      "include": ["**/*.js", "ambient.d.ts"],
+      "exclude": ["node_modules"]
+    }
+    EOF
