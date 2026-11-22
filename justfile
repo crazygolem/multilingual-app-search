@@ -5,7 +5,7 @@
 # Package the extension
 pack:
     mkdir -p dist/
-    gnome-extensions pack --force --extra-source ../LICENSE --out-dir dist/ src/
+    gnome-extensions pack --force --extra-source ../LICENSE --extra-source bilingualSearch.js --extra-source searchHelper.js --extra-source utils.js --out-dir dist/ src/
 
 # Package and run the extension in a nested shell
 debug: pack

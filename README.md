@@ -36,10 +36,14 @@ Go to the [GNOME Extensions page for this extension](https://extensions.gnome.or
 
 ## How it works
 
-This extension lifts upstream GNOME Search's code related to the application result list, and changes the part that searches through your applications to use a custom function.
-The lifted and customized code then replaces the original code when the extension is enabled (and reverts the change when disabled).
+GNOME Search finds applications with GLib's search function, which only looks at the strings in your language.
+This extension makes it search a shadow copy of your applications' Desktop files instead, in which each translated value also holds the untranslated one (usually English).
+The search runs in a small helper process (a GJS script), which calls GLib's standard search function on the shadow copies.
 
-The custom search function reimplements upstream GLib's search function, which is used by the original GNOME Search code, but looks up search terms in both the localized and default keys of applications' Desktop file, where GLib's search function uses only the localized keys.
+Searching both languages at once, rather than each one separately, lets GLib rank all matches together: combining two separate searches would always list the matches in one language before those in the other, even when the latter match better.
+However, recent versions of GLib rank words that come first higher, and the localized words come first in the shadow copies, so a match in English can rank slightly below an equally good match in your language.
+
+Earlier versions of the extension reimplemented GLib's search instead, which could merge the results better across languages, but had to be kept in sync with every upstream change.
 
 ## FAQ
 
