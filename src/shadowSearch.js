@@ -41,6 +41,24 @@ const RESTART_DELAY_US = 10 * GLib.USEC_PER_SEC
  * without a change to their desktop files, see ShadowSync.scheduleCheck() */
 const CHECK_INTERVAL_US = 5 * GLib.USEC_PER_SEC
 
+// The panel of the Settings app with the ID "<id>" is described by
+// gnome-<id>-panel.desktop, and Settings' search provider uses that ID for the
+// panel's result.
+//
+// cf. https://gitlab.gnome.org/GNOME/gnome-control-center/-/blob/51.1/shell/cc-panel-loader.c#L241
+const SETTINGS_PANEL_DESKTOP_ID = /^gnome-(.+)-panel\.desktop$/
+
+/**
+ * Returns the ID of the Settings panel described by the desktop file with the
+ * given desktop ID, or null if it doesn't describe one.
+ *
+ * @param {?string} desktopId
+ * @returns {?string}
+ */
+export function settingsPanelId(desktopId) {
+    return desktopId?.match(SETTINGS_PANEL_DESKTOP_ID)?.[1] ?? null
+}
+
 /**
  * Searches the apps in both languages. Its files (the copies, and the data
  * directories the helper runs with) are kept in a directory of its own in the
@@ -131,9 +149,14 @@ function makeProcessDir(parent) {
  * stock search, since GLib also ranks matches by their position in the value.
  * Every key gets combined, not only the ones GLib searches, so that this keeps
  * working if GLib starts searching other keys. The keys GLib uses otherwise,
- * like Exec or TryExec, are never translated, and are copied as they are.
+ * like Exec or TryExec, are never translated, and are copied as they are,
+ * unless they're in `omittedKeys`.
+ *
+ * @param {Gio.AppInfo} appInfo
+ * @param {string[]} [omittedKeys] keys left out of the copy
+ * @returns {?string}
  */
-function combineTranslations(appInfo) {
+function combineTranslations(appInfo, omittedKeys = []) {
     const path = appInfo.get_filename?.()
     if (!path)
         return null
@@ -149,7 +172,7 @@ function combineTranslations(appInfo) {
     const [keys] = source.get_keys(DESKTOP_GROUP)
     for (const key of keys) {
         // Translations, folded into their key
-        if (key.includes('['))
+        if (key.includes('[') || omittedKeys.includes(key))
             continue
 
         const localized = tryOrNull(() => source.get_locale_string(DESKTOP_GROUP, key, null))
@@ -251,9 +274,19 @@ export class ShadowSync {
         // where GLib's search index doesn't. If the program appears later
         // without a desktop file changing, stock search finds the app right
         // away, but this only does after scheduleCheck() noticed it.
+        //
+        // The Settings panels get copied without their Exec key. GLib also
+        // matches the name of the program an app runs, and every panel runs
+        // gnome-control-center, so "gnome" or "control" would find them all.
+        // Only the search for Settings panels uses their copies (see
+        // settingsProviderPatch.js), and Settings doesn't match the Exec line
+        // either.
+        // Since they're hidden (NoDisplay), the app search doesn't show them,
+        // so it's not affected.
         for (const appInfo of appInfos) {
             const id = appInfo.get_id()
-            const contents = id ? combineTranslations(appInfo) : null
+            const isPanel = settingsPanelId(id) !== null && appInfo.get_nodisplay?.()
+            const contents = id ? combineTranslations(appInfo, isPanel ? ['Exec'] : []) : null
             if (contents !== null)
                 current.set(id, contents)
         }
@@ -388,9 +421,11 @@ export class SearchHelper {
             })
             for (const [name, value] of Object.entries(this.#environment))
                 launcher.setenv(name, value, true)
-            process = launcher.spawnv(['gjs', '-m', HELPER_PATH])
+            process = launcher.spawnv(['gjs', '-m', HELPER_PATH, this.#logPrefix])
         } catch (e) {
-            console.warn(`${this.#logPrefix}: could not start the search helper: ${e.message}`)
+            console.warn('[%s]', this.#logPrefix,
+                'could not start the search helper:',
+                e.message)
             return false
         }
 
@@ -450,7 +485,7 @@ export class SearchHelper {
     /** @param {string} [reason] logged if given: the process stopped unexpectedly */
     #stop(reason) {
         if (reason)
-            console.warn(`${this.#logPrefix}: ${reason}`)
+            console.warn('[%s]', this.#logPrefix, reason)
 
         this.#cancellable?.cancel()
         tryOrNull(() => this.#stdin?.close(null))

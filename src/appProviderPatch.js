@@ -18,8 +18,7 @@ export class AppProviderPatch {
     #originalGetInitialResultSet
     #originalSearch
 
-    // ShadowSearch's results for the app search in progress, see
-    // #getInitialResultSet()
+    // ShadowSearch's results for the app search in progress
     #prefetched = null
 
     /** @param {import('./shadowSearch.js').ShadowSearch} shadowSearch */
@@ -27,9 +26,6 @@ export class AppProviderPatch {
         this.#shadowSearch = shadowSearch
 
         const patch = this
-        // The wrappers call the originals they captured, not the fields, which
-        // destroy() clears: a wrapper can still get called after that, e.g. by
-        // another extension that patched the same function after this one.
         const getInitialResultSet = AppDisplay.AppSearchProvider.prototype.getInitialResultSet
         this.#originalGetInitialResultSet = getInitialResultSet
         AppDisplay.AppSearchProvider.prototype.getInitialResultSet = function (terms, cancellable) {

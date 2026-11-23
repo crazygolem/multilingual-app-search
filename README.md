@@ -43,6 +43,10 @@ The search runs in a small helper process (a GJS script), which calls GLib's sta
 Searching both languages at once, rather than each one separately, lets GLib rank all matches together: combining two separate searches would always list the matches in one language before those in the other, even when the latter match better.
 However, recent versions of GLib rank words that come first higher, and the localized words come first in the shadow copies, so a match in English can rank slightly below an equally good match in your language.
 
+The Settings section of the search results also lists the Settings panels that match in English ("Privacy" instead of "Vie privée").
+Settings only finds its panels in your language, so the extension adds the panels that GLib's search finds in the shadow copies, after the ones Settings found, when they match only thanks to the untranslated strings.
+Those are matched with GLib's rules, which only look at the panels' names and keywords: unlike Settings, they don't look at the descriptions.
+
 Earlier versions of the extension reimplemented GLib's search instead, which could merge the results better across languages, but had to be kept in sync with every upstream change.
 
 ## FAQ

@@ -2,7 +2,8 @@
 
 // Search helper of the extension. It isn't imported by the extension: it runs
 // in a process of its own, started by SearchHelper in shadowSearch.js with
-// `gjs -m`, and it exits when its stdin gets closed.
+// `gjs -m`, and it exits when its stdin gets closed. Its argument is the prefix
+// of the messages it logs.
 //
 // It runs GLib's app search, the one stock GNOME Shell uses, for each query it
 // reads on stdin (one per line), and writes each result on stdout as one line
@@ -17,6 +18,7 @@
 import Gio from 'gi://Gio'
 import GioUnix from 'gi://GioUnix'
 
+const [logPrefix] = ARGV
 const stdin = new Gio.DataInputStream({base_stream: new GioUnix.InputStream({fd: 0})})
 
 // Synchronous reads, without a main loop: nothing else runs in this process,
@@ -34,7 +36,7 @@ for (;;) {
     } catch (e) {
         // The query is not directly logged to avoid getting what the user typed
         // end up in the journal.
-        printerr(`A search failed: ${e}`)
+        printerr(`[${logPrefix}] a search failed in the search helper: ${e}`)
     }
     print(JSON.stringify(groups))
 }
