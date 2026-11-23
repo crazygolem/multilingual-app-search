@@ -7,6 +7,7 @@
 
 import Shell from 'gi://Shell'
 import * as AppDisplay from 'resource:///org/gnome/shell/ui/appDisplay.js'
+import {InjectionManager} from 'resource:///org/gnome/shell/extensions/extension.js'
 
 
 /**
@@ -15,8 +16,7 @@ import * as AppDisplay from 'resource:///org/gnome/shell/ui/appDisplay.js'
  */
 export class AppProviderPatch {
     #shadowSearch
-    #originalGetInitialResultSet
-    #originalSearch
+    #injections = new InjectionManager()
 
     // ShadowSearch's results for the app search in progress
     #prefetched = null
@@ -26,22 +26,17 @@ export class AppProviderPatch {
         this.#shadowSearch = shadowSearch
 
         const patch = this
-        const getInitialResultSet = AppDisplay.AppSearchProvider.prototype.getInitialResultSet
-        this.#originalGetInitialResultSet = getInitialResultSet
-        AppDisplay.AppSearchProvider.prototype.getInitialResultSet = function (terms, cancellable) {
-            return patch.#getInitialResultSet(this, getInitialResultSet, terms, cancellable)
-        }
-
-        const search = Shell.AppSystem.search
-        this.#originalSearch = search
-        Shell.AppSystem.search = query => this.#search(search, query)
+        this.#injections.overrideMethod(AppDisplay.AppSearchProvider.prototype, 'getInitialResultSet',
+            original => function (terms, cancellable) {
+                return patch.#getInitialResultSet(this, original, terms, cancellable)
+            })
+        this.#injections.overrideMethod(Shell.AppSystem, 'search',
+            original => query => patch.#search(original, query))
     }
 
     destroy() {
-        Shell.AppSystem.search = this.#originalSearch
-        this.#originalSearch = null
-        AppDisplay.AppSearchProvider.prototype.getInitialResultSet = this.#originalGetInitialResultSet
-        this.#originalGetInitialResultSet = null
+        this.#injections.clear()
+        this.#injections = null
         this.#prefetched = null
         this.#shadowSearch = null
     }

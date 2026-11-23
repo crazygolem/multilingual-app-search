@@ -21,6 +21,7 @@
 import Gio from 'gi://Gio'
 import GioUnix from 'gi://GioUnix'
 import * as Main from 'resource:///org/gnome/shell/ui/main.js'
+import {InjectionManager} from 'resource:///org/gnome/shell/extensions/extension.js'
 
 import {settingsPanelId} from './shadowSearch.js'
 
@@ -68,8 +69,7 @@ function isProviderEnabled() {
  */
 export class SettingsProviderPatch {
     #shadowSearch
-    #proto = null
-    #originals = null
+    #injections = new InjectionManager()
     // Kept, as Gio.AppInfoMonitor.get() returns a new monitor once the
     // previous one is finalized, which would drop the handler
     #monitor
@@ -91,8 +91,8 @@ export class SettingsProviderPatch {
         // all in the Search settings (reenabling them won't be noticed until
         // the extension gets enabled again), or the Shell's internals changed.
         // Only the latter is possible when Settings' provider is loaded.
-        this.#proto = findRemoteProviderPrototype()
-        if (!this.#proto) {
+        const proto = findRemoteProviderPrototype()
+        if (!proto) {
             if (isProviderEnabled()) {
                 console.warn("[%s]", logPrefix,
                     "could not find the Shell's remote search providers, so",
@@ -104,17 +104,10 @@ export class SettingsProviderPatch {
             return
         }
 
-        const patch = this
-        const {getInitialResultSet, getSubsearchResultSet} = this.#proto
-        this.#originals = {getInitialResultSet, getSubsearchResultSet}
-
         // The prototype is shared by all the remote providers, but the calls
         // of the providers other than Settings go straight to the originals:
         // their terms and results are left alone.
         //
-        // The wrappers call the originals they captured, not the fields, which
-        // destroy() clears: a wrapper can still get called after that, e.g. by
-        // another extension that patched the same function after this one.
         // Settings ignores the previous results of a subsearch, and searches
         // again (cc-search-provider.c), so the panels are searched again too.
         //
@@ -122,36 +115,36 @@ export class SettingsProviderPatch {
         // results: the Shell shows no results at all for a provider whose
         // search fails.
         // cf. https://gitlab.gnome.org/GNOME/gnome-shell/-/blob/51.1/js/ui/search.js#L721-741
-        this.#proto.getInitialResultSet = function (terms, cancellable) {
-            const results = getInitialResultSet.call(this, terms, cancellable)
+        const patch = this
+        this.#injections.overrideMethod(proto, 'getInitialResultSet',
+            original => function (terms, cancellable) {
+                const results = original.call(this, terms, cancellable)
 
-            if (this.id !== PROVIDER_ID)
-                return results
+                if (this.id !== PROVIDER_ID)
+                    return results
 
-            return patch.#augmentResults(this, results, terms, cancellable).catch(e => {
-                console.error(e)
-                return results
+                return patch.#augmentResults(this, results, terms, cancellable).catch(e => {
+                    console.error(e)
+                    return results
+                })
             })
-        }
-        this.#proto.getSubsearchResultSet = function (previousResults, terms, cancellable) {
-            const results = getSubsearchResultSet.call(this, previousResults, terms, cancellable)
+        this.#injections.overrideMethod(proto, 'getSubsearchResultSet',
+            original => function (previousResults, terms, cancellable) {
+                const results = original.call(this, previousResults, terms, cancellable)
 
-            if (this.id !== PROVIDER_ID)
-                return results
+                if (this.id !== PROVIDER_ID)
+                    return results
 
-            return patch.#augmentResults(this, results, terms, cancellable).catch(e => {
-                console.error(e)
-                return results
+                return patch.#augmentResults(this, results, terms, cancellable).catch(e => {
+                    console.error(e)
+                    return results
+                })
             })
-        }
     }
 
     destroy() {
-        if (this.#proto)
-            Object.assign(this.#proto, this.#originals)
-        this.#proto = null
-        this.#originals = null
-
+        this.#injections.clear()
+        this.#injections = null
         this.#monitor.disconnect(this.#monitorHandlerId)
         this.#monitorHandlerId = null
         this.#monitor = null
