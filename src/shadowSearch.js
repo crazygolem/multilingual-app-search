@@ -4,11 +4,11 @@
 //
 // GLib only searches the strings of the locale it takes from the process'
 // environment, and the shell's environment can't be changed. So the search
-// runs in a separate process (searchHelper.js) without a locale, on copies of
+// runs in a separate process (helper/main.js) without a locale, on copies of
 // the desktop files in which each translated string holds both languages.
 //
-// Only GLib and Gio are imported, here and in utils.js, so this module also
-// loads in a plain `gjs -m`.
+// ShadowSearch is the search itself: ShadowSync keeps the copies in sync with
+// the installed apps, and SearchHelper runs the helper process on them.
 
 import Gio from 'gi://Gio'
 import GLib from 'gi://GLib'
@@ -16,6 +16,10 @@ import GLib from 'gi://GLib'
 import {listDir, removeTree, tryOrNull, withTimeout} from './utils.js'
 
 const DESKTOP_GROUP = 'Desktop Entry'
+
+/** The helper's program, next to this module */
+const HELPER_PATH = Gio.File.new_for_uri(import.meta.url).get_parent()
+    .resolve_relative_path('helper/main.js').get_path()
 
 /** How long a search waits for the helper before giving up */
 const SEARCH_TIMEOUT_MS = 500
@@ -34,8 +38,87 @@ const MAX_PENDING_BYTES = 16 * 1024
 const RESTART_DELAY_US = 10 * GLib.USEC_PER_SEC
 
 /** Minimum time between two checks for apps that appeared or disappeared
- * without a change to their desktop files, see ShadowAppDir.scheduleCheck() */
+ * without a change to their desktop files, see ShadowSync.scheduleCheck() */
 const CHECK_INTERVAL_US = 5 * GLib.USEC_PER_SEC
+
+/**
+ * Searches the apps in both languages. Its files (the copies, and the data
+ * directories the helper runs with) are kept in a directory of its own in the
+ * user's runtime directory, which destroy() removes.
+ */
+export class ShadowSearch {
+    #runtimeDir
+    #shadowSync
+    #helper
+
+    /**
+     * @param {string} uuid the extension's UUID, which names its directory in
+     *   the user's runtime directory and prefixes the messages it logs
+     */
+    constructor(uuid) {
+        this.#runtimeDir = makeProcessDir(GLib.build_filenamev([GLib.get_user_runtime_dir(), uuid]))
+        const dataDir = GLib.build_filenamev([this.#runtimeDir, 'share'])
+        // The helper's only system data directory, so that the copies are the
+        // only desktop files it sees
+        const emptyDir = GLib.build_filenamev([this.#runtimeDir, 'empty'])
+        GLib.mkdir_with_parents(emptyDir, 0o700)
+
+        this.#shadowSync = new ShadowSync(GLib.build_filenamev([dataDir, 'applications']))
+        this.#helper = new SearchHelper({LANGUAGE: 'C', XDG_DATA_HOME: dataDir, XDG_DATA_DIRS: emptyDir}, uuid)
+    }
+
+    destroy() {
+        this.#helper.destroy()
+        this.#helper = null
+        this.#shadowSync.destroy()
+        this.#shadowSync = null
+        removeTree(this.#runtimeDir)
+        this.#runtimeDir = null
+    }
+
+    /**
+     * Resolves with GLib's result groups for the query, in both languages,
+     * like Shell.AppSystem.search() returns, or with null if the helper can't
+     * answer in time.
+     *
+     * @param {string} query
+     * @returns {Promise<?string[][]>}
+     */
+    search(query) {
+        this.#shadowSync.scheduleCheck()
+        return this.#helper.search(query)
+    }
+}
+
+/**
+ * Creates an empty directory for this process in `parent`, after deleting
+ * those of processes that don't run anymore (e.g. a shell that crashed), and
+ * returns its path.
+ *
+ * Several GNOME Shell processes of the same user can run the extension at the
+ * same time, e.g. a nested shell started for development, and they share the
+ * runtime directory. Each one keeps its files in a directory of its own, so
+ * that they don't delete or overwrite each other's.
+ */
+function makeProcessDir(parent) {
+    const pid = new Gio.Credentials().get_unix_pid()
+
+    // Without /proc, there's no telling which processes still run
+    const canCheck = GLib.file_test('/proc/self', GLib.FileTest.EXISTS)
+
+    for (const name of listDir(parent)) {
+        if (!/^[0-9]+$/.test(name))
+            continue
+
+        const isDead = canCheck && !GLib.file_test(`/proc/${name}`, GLib.FileTest.EXISTS)
+        if (isDead || Number(name) === pid)
+            removeTree(GLib.build_filenamev([parent, name]))
+    }
+
+    const dir = GLib.build_filenamev([parent, String(pid)])
+    GLib.mkdir_with_parents(dir, 0o700)
+    return dir
+}
 
 /**
  * Returns the contents of a copy of the app's desktop file, keeping only its
@@ -81,17 +164,17 @@ function combineTranslations(appInfo) {
 }
 
 /**
- * An `applications` directory that shadows the installed apps: it holds a copy
- * of the desktop file of each one, with both languages in each translated value
- * (see combineTranslations), and gets updated when apps are installed, removed
- * or changed.
+ * Keeps an `applications` directory that shadows the installed apps: it holds
+ * a copy of the desktop file of each one, with both languages in each
+ * translated value (see combineTranslations), and the copies get updated when
+ * apps are installed, removed or changed.
  */
-export class ShadowAppDir {
+export class ShadowSync {
     #dir
     #written = new Map()
     // Kept, as Gio.AppInfoMonitor.get() returns a new monitor once the
     // previous one is finalized, which would drop the handler
-    #monitor = Gio.AppInfoMonitor.get()
+    #monitor
     #monitorHandlerId
     // The desktop IDs returned by get_all() for the last update
     #appIds = new Set()
@@ -106,6 +189,7 @@ export class ShadowAppDir {
         this.#dir = dir
         GLib.mkdir_with_parents(dir, 0o700)
 
+        this.#monitor = Gio.AppInfoMonitor.get()
         this.#monitorHandlerId = this.#monitor.connect('changed', () => this.#update())
         this.#update()
     }
@@ -127,9 +211,9 @@ export class ShadowAppDir {
      * app whose TryExec program got installed.
      *
      * This is meant to be called with each search, and the check happens after
-     * it, when the main loop is idle, so the search that triggers it doesn't
-     * see the change yet, but the next ones do. It's done at most once every
-     * few seconds, as get_all() parses every desktop file.
+     * it, when the main loop is idle. The search that triggers it doesn't see
+     * the change yet, but the next ones do. It's done at most once every few
+     * seconds, as get_all() parses every desktop file.
      */
     scheduleCheck() {
         if (this.#checkSourceId !== null ||
@@ -180,6 +264,9 @@ export class ShadowAppDir {
         }
 
         const written = new Map()
+        // An error will likely only happen if a write fails because the disk is
+        // full, and all subsequent writes will fail in the same way. Only the
+        // first error gets logged to not spam the logs.
         let error = null
         for (const [id, contents] of current) {
             try {
@@ -188,6 +275,11 @@ export class ShadowAppDir {
                 written.set(id, contents)
             } catch (e) {
                 error ??= e
+                // The previous copy (if any) is still there, so it's tracked
+                // for deletion, and its differing contents get the write
+                // retried
+                if (this.#written.has(id))
+                    written.set(id, this.#written.get(id))
             }
         }
         if (error)
@@ -210,12 +302,11 @@ export class ShadowAppDir {
 }
 
 /**
- * Runs searchHelper.js in a process of its own, and passes it the searches.
+ * Runs helper/main.js in a process of its own, and passes it the searches.
  * The process gets restarted when needed, by the next search after it exited
  * or got stuck.
  */
 export class SearchHelper {
-    #argv
     #environment
     #logPrefix
     #process = null
@@ -232,12 +323,11 @@ export class SearchHelper {
     #pendingSize = 0
 
     /**
-     * @param {string[]} argv the command that runs searchHelper.js
-     * @param {Object<string, string>} environment variables to set for it
+     * @param {Object<string, string>} environment variables to set for the
+     *   process
      * @param {string} logPrefix for the messages logged about it
      */
-    constructor(argv, environment, logPrefix) {
-        this.#argv = argv
+    constructor(environment, logPrefix) {
         this.#environment = environment
         this.#logPrefix = logPrefix
         this.#start()
@@ -298,7 +388,7 @@ export class SearchHelper {
             })
             for (const [name, value] of Object.entries(this.#environment))
                 launcher.setenv(name, value, true)
-            process = launcher.spawnv(this.#argv)
+            process = launcher.spawnv(['gjs', '-m', HELPER_PATH])
         } catch (e) {
             console.warn(`${this.#logPrefix}: could not start the search helper: ${e.message}`)
             return false

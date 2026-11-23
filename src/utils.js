@@ -1,5 +1,4 @@
-// Utilities used by the extension. Only GLib and Gio are imported, so this
-// module also loads in a plain `gjs -m`.
+// Utilities used by the extension.
 
 import Gio from 'gi://Gio'
 import GLib from 'gi://GLib'
