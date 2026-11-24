@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <schema id="org.gnome.shell.extensions.bilingual-app-search"
+          path="/org/gnome/shell/extensions/bilingual-app-search/">
+    <key name="handle-settings-provider" type="b">
+      <default>true</default>
+      <summary>Find Settings panels in both languages</summary>
+      <description>Whether the Settings section of the search results also lists the Settings panels that match in their untranslated strings (usually English), after the ones Settings finds in the session's language. It has no effect when the Shell doesn't search Settings, e.g. when parental controls block the Settings app.</description>
+    </key>
+  </schema>
+</schemalist>

@@ -99,7 +99,9 @@ export class SettingsProviderPatch {
                     "the Settings panels will only get the stock results;",
                     "it is likely due to a change in the Shell's internals, or",
                     "to the parental controls hiding the Settings app, in",
-                    "which case this warning can be safely ignored.")
+                    "which case this warning can be safely ignored, or",
+                    "silenced by turning off Settings under Other Results in",
+                    "the extension's preferences.")
             }
             return
         }

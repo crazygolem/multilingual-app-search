@@ -1,0 +1,19 @@
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+
+#: src/prefs.js:11
+msgid "Other Results"
+msgstr ""
+
+#. Translators: "Settings" is the name of the Settings app, whose
+#. panels are Wi-Fi, Bluetooth, Displays, ...
+#: src/prefs.js:16
+msgid "Settings"
+msgstr ""
+
+#: src/prefs.js:17
+msgid ""
+"Augment search results from the Settings application, finding extra panels "
+"by their name and keywords."
+msgstr ""
