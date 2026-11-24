@@ -1,5 +1,5 @@
 {
-  "name": "Bilingual App Search",
+  "name": "Multilingual App Search",
   "description": "Make GNOME Search look up applications in several languages.",
   "uuid": "bilingual-app-search@pwa.lu",
   "settings-schema": "org.gnome.shell.extensions.bilingual-app-search",
@@ -12,5 +12,5 @@
     "50",
     "51"
   ],
-  "url": "https://github.com/crazygolem/bilingual-app-search"
+  "url": "https://github.com/crazygolem/multilingual-app-search"
 }

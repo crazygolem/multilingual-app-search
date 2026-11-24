@@ -6,7 +6,7 @@ import {ExtensionPreferences, gettext as _} from 'resource:///org/gnome/Shell/Ex
 import {LanguagesGroup} from './prefs/languagesGroup.js'
 
 
-export default class BilingualAppSearchPreferences extends ExtensionPreferences {
+export default class MultilingualAppSearchPreferences extends ExtensionPreferences {
     fillPreferencesWindow(window) {
         const settings = this.getSettings()
 

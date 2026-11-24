@@ -10,6 +10,7 @@
 A GNOME extension to make GNOME Search look up applications in several languages.
 
 This started out as a workaround for the GNOME issue [#443 (Search for applications in both English and local language)](https://gitlab.gnome.org/GNOME/glib/-/issues/443), and has since gained full multilingual search support with configurable languages.
+The extension's UUID still reflects its humble beginnings.
 
 **Is this extension for you?**
 

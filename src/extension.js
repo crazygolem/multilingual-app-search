@@ -6,7 +6,7 @@ import {SettingsProviderPatch} from './shell/settingsProviderPatch.js'
 import {ShadowSearch} from './shell/shadowSearch.js'
 
 
-export default class BilingualAppSearch extends Extension {
+export default class MultilingualAppSearch extends Extension {
     #settings
     #settingsHandlerIds
     #shadowSearch
