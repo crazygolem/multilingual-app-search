@@ -6,10 +6,12 @@ import GLib from 'gi://GLib'
 import GObject from 'gi://GObject'
 import Gtk from 'gi://Gtk'
 import Pango from 'gi://Pango'
+
 import {gettext as _, ngettext} from 'resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js'
 
 import {DEFAULT} from '../languages.js'
-import {describeLanguage, formatNumbers, languageName} from './languageCatalog.js'
+import {describeLanguage, languageName} from './languageCatalog.js'
+
 
 /**
  * Lists the languages that can be added to the list: those the installed apps
@@ -158,7 +160,7 @@ class AddLanguageDialog extends Adw.Dialog {
 
         const count = this.#catalog.countApps(language)
         const apps = new Gtk.Label({
-            label: count > 0 ? formatNumbers(ngettext("%d app", "%d apps", count), count) : _("No apps"),
+            label: count > 0 ? ngettext("%d app", "%d apps", count).format(count) : _("No apps"),
             xalign: 1,
             css_classes: ['dim-label', 'numeric'],
         })

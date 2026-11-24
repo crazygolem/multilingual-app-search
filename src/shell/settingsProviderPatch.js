@@ -21,10 +21,12 @@
 
 import Gio from 'gi://Gio'
 import GioUnix from 'gi://GioUnix'
+
 import * as Main from 'resource:///org/gnome/shell/ui/main.js'
 import {InjectionManager} from 'resource:///org/gnome/shell/extensions/extension.js'
 
 import {settingsPanelId} from './shadowSearch.js'
+
 
 const PROVIDER_ID = 'org.gnome.Settings.desktop'
 const SEARCH_PROVIDERS_SCHEMA = 'org.gnome.desktop.search-providers'
@@ -95,7 +97,7 @@ export class SettingsProviderPatch {
         const proto = findRemoteProviderPrototype()
         if (!proto) {
             if (isProviderEnabled()) {
-                console.warn("[%s]", logPrefix,
+                console.warn('[%s]', logPrefix,
                     "could not find the Shell's remote search providers, so",
                     "the Settings panels will only get the stock results;",
                     "it is likely due to a change in the Shell's internals, or",

@@ -1,9 +1,9 @@
 import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js'
 
-import {AppProviderPatch} from './appProviderPatch.js'
 import {normalizeLanguages} from './languages.js'
-import {SettingsProviderPatch} from './settingsProviderPatch.js'
-import {ShadowSearch} from './shadowSearch.js'
+import {AppProviderPatch} from './shell/appProviderPatch.js'
+import {SettingsProviderPatch} from './shell/settingsProviderPatch.js'
+import {ShadowSearch} from './shell/shadowSearch.js'
 
 
 export default class BilingualAppSearch extends Extension {

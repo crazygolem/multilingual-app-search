@@ -17,9 +17,15 @@ pack *args:
         esac
     done
 
-    if (( release )) && ! just check-po; then
-        >&2 echo "note: \`just pack --no-release\` packages the extension without checking the translations"
-        exit 1
+    if (( release )); then
+        # Both run, so that one run reports all the problems
+        checks=0
+        just check-po || checks=1
+        just lint || checks=1
+        if (( checks != 0 )); then
+            >&2 echo "note: \`just pack --no-release\` packages the extension without the checks"
+            exit 1
+        fi
     fi
 
     mkdir -p dist/
@@ -118,6 +124,17 @@ pot output:
     } >"$output.new"
     mv "$output.new" "$output"
 
+# Check the code with ESLint (set up by `just devenv-setup`)
+lint:
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    if [[ ! -x node_modules/.bin/eslint ]]; then
+        >&2 echo "error: ESLint is not installed: run \`just devenv-setup\` first"
+        exit 1
+    fi
+    node_modules/.bin/eslint src/
+
 # Package and run the extension in a nested shell
 debug: (pack "--no-release")
     gnome-extensions install --force dist/bilingual-app-search@pwa.lu.shell-extension.zip
@@ -133,7 +150,7 @@ upload: pack
     test -z "$(git status --porcelain src/)"
     gnome-extensions upload --accept-tos dist/bilingual-app-search@pwa.lu.shell-extension.zip
 
-# Set up code completion in editors
+# Set up code completion in editors, and ESLint
 devenv-setup shell="latest":
     #!/usr/bin/env bash
     set -euo pipefail
@@ -144,8 +161,19 @@ devenv-setup shell="latest":
     rm -rf node_modules/ bun.lock
     echo '{}' > package.json
 
-    # Imports the appropriate version of @girs/gjs as a transitive dependency
-    bun add --no-save "@girs/gnome-shell@${shell}"
+    # Imports the appropriate version of @girs/gjs as a transitive dependency.
+    # GNOME's ESLint config isn't published on npm, so it's pinned to a commit
+    # of its repository, like GJS and GNOME Shell do (tools/package.json).
+    #
+    # ESLint 9 is no longer supported (bun warns that it's deprecated), but
+    # it's the version GNOME's config is made for, and the one GJS and GNOME
+    # Shell use. With ESLint 10, no-shadow flags the class names in the usual
+    # GObject.registerClass(class Name ...), and the config's JSDoc plugin
+    # (eslint-plugin-jsdoc 48) still pulls ESLint 9 in.
+    bun add --no-save \
+        "@girs/gnome-shell@${shell}" \
+        'eslint@^9.39' \
+        'git+https://gitlab.gnome.org/World/javascript/eslint-config-gnome.git#c479d059e8d9ea99c3b53c2ea43abf7fdb05eb51'
 
     # Declares the gi:// and resource:/// module paths
     cat > ambient.d.ts <<'EOF'

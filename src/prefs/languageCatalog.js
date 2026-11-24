@@ -4,12 +4,14 @@
 import Gio from 'gi://Gio'
 import GLib from 'gi://GLib'
 import GnomeDesktop from 'gi://GnomeDesktop?version=4.0'
+
 import {gettext as _, ngettext} from 'resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js'
 
 import {DEFAULT, SESSION} from '../languages.js'
 import {tryOrNull} from '../utils.js'
 
-const DESKTOP_GROUP = 'Desktop Entry'
+
+const DESKTOP_GROUP = GLib.KEY_FILE_DESKTOP_GROUP
 
 /** A locale name as desktop files use them: a language, then optionally a
  * country and a modifier, e.g. "sr_RS@latin" */
@@ -86,7 +88,7 @@ export class LanguageCatalog {
 /** Returns the locales the app's desktop file has strings in */
 function translatedLocales(appInfo) {
     const locales = new Set()
-    const path = appInfo.get_filename?.()
+    const path = appInfo.get_filename()
     const keyFile = new GLib.KeyFile()
     // Without KEEP_TRANSLATIONS, only the strings of the session's languages
     // are loaded
@@ -166,7 +168,7 @@ export function describeLanguage(language, catalog) {
                 // Translators: the numbers of apps that have strings in the
                 // language, and of apps installed. The plural form is chosen
                 // by the first one.
-                ? formatNumbers(ngettext("In %d of %d apps", "In %d of %d apps", count), count, catalog.appCount)
+                ? ngettext("In %d of %d apps", "In %d of %d apps", count).format(count, catalog.appCount)
                 : _("Not in any installed app yet"),
         }
     }
@@ -210,10 +212,4 @@ function sessionLocale() {
  * e.g. "fr_CH" for "fr_CH.UTF-8", or "sr_RS@latin" for "sr_RS.UTF-8@latin" */
 function withoutCodeset(name) {
     return name.replace(/\.[^@]*/, '')
-}
-
-/** Replaces each %d of a translated string with the next number */
-export function formatNumbers(template, ...numbers) {
-    let next = 0
-    return template.replace(/%d/g, () => String(numbers[next++]))
 }

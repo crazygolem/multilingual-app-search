@@ -2,10 +2,13 @@
 // uses, in the strings of their desktop files in several languages: those of
 // the extension's preferences (see languages.js).
 //
-// GLib only searches the strings of the locale it takes from the process'
-// environment, and the shell's environment can't be changed. So the search
-// runs in a separate process (helper/main.js) without a locale, on copies of
-// the desktop files in which each translated string holds every language.
+// GLib only searches the desktop files of the data directories it takes from
+// the process' environment, and only their strings in the process' locale,
+// and the shell's environment can't be changed. So the search runs in a
+// separate process (helper/main.js) whose only desktop files are copies of
+// the apps'. In the copies, the untranslated value of each translated key
+// holds every language, and the translations are left out, so the locale
+// doesn't matter.
 //
 // ShadowSearch is the search itself: ShadowSync keeps the copies in sync with
 // the installed apps, and SearchHelper runs the helper process on them.
@@ -13,14 +16,14 @@
 import Gio from 'gi://Gio'
 import GLib from 'gi://GLib'
 
-import {DEFAULT, SESSION} from './languages.js'
-import {listDir, removeTree, tryOrNull, withTimeout} from './utils.js'
+import {DEFAULT, SESSION} from '../languages.js'
+import {listDir, removeTree, tryOrNull} from '../utils.js'
 
-const DESKTOP_GROUP = 'Desktop Entry'
 
-/** The helper's program, next to this module */
-const HELPER_PATH = Gio.File.new_for_uri(import.meta.url).get_parent()
-    .resolve_relative_path('helper/main.js').get_path()
+const DESKTOP_GROUP = GLib.KEY_FILE_DESKTOP_GROUP
+
+const HELPER_PATH = GLib.canonicalize_filename('../helper/main.js',
+    GLib.path_get_dirname(GLib.filename_from_uri(import.meta.url)[0]))
 
 /** How long a search waits for the helper before giving up */
 const SEARCH_TIMEOUT_MS = 500
@@ -85,7 +88,7 @@ export class ShadowSearch {
         GLib.mkdir_with_parents(emptyDir, 0o700)
 
         this.#shadowSync = new ShadowSync(GLib.build_filenamev([dataDir, 'applications']), languages)
-        this.#helper = new SearchHelper({LANGUAGE: 'C', XDG_DATA_HOME: dataDir, XDG_DATA_DIRS: emptyDir}, uuid)
+        this.#helper = new SearchHelper({XDG_DATA_HOME: dataDir, XDG_DATA_DIRS: emptyDir}, uuid)
     }
 
     /**
@@ -104,6 +107,9 @@ export class ShadowSearch {
         this.#shadowSync.destroy()
         this.#shadowSync = null
         removeTree(this.#runtimeDir)
+        // Fails, leaving it, while other shell processes have their directory
+        // in it
+        GLib.rmdir(GLib.path_get_dirname(this.#runtimeDir))
         this.#runtimeDir = null
     }
 
@@ -175,7 +181,7 @@ function makeProcessDir(parent) {
  * @returns {?string}
  */
 function combineTranslations(appInfo, languages, omittedKeys = []) {
-    const path = appInfo.get_filename?.()
+    const path = appInfo.get_filename()
     if (!path)
         return null
 
@@ -350,7 +356,7 @@ export class ShadowSync {
         // so it's not affected.
         for (const appInfo of appInfos) {
             const id = appInfo.get_id()
-            const isPanel = settingsPanelId(id) !== null && appInfo.get_nodisplay?.()
+            const isPanel = settingsPanelId(id) !== null && appInfo.get_nodisplay()
             const contents = id ? combineTranslations(appInfo, this.#languages, isPanel ? ['Exec'] : []) : null
             if (contents !== null)
                 current.set(id, contents)
@@ -412,11 +418,10 @@ export class SearchHelper {
     #stdout = null
     #cancellable = null
     #lastStart = null
-    #destroyed = false
 
     // The searches sent to the process, in the order they were sent, which is
-    // also the order of the replies: {resolve, sentAt, size}. A search that
-    // timed out stays here until its reply arrives.
+    // also the order of the replies: {resolve, sentAt, size, timeoutId}. A
+    // search that timed out stays here until its reply arrives.
     #pending = []
     #pendingSize = 0
 
@@ -432,7 +437,6 @@ export class SearchHelper {
     }
 
     destroy() {
-        this.#destroyed = true
         this.#stop()
     }
 
@@ -457,7 +461,13 @@ export class SearchHelper {
             return Promise.resolve(null)
 
         const reply = new Promise(resolve => {
-            this.#pending.push({resolve, sentAt: now, size: line.length})
+            const search = {resolve, sentAt: now, size: line.length, timeoutId: null}
+            search.timeoutId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, SEARCH_TIMEOUT_MS, () => {
+                search.timeoutId = null
+                resolve(null)
+                return GLib.SOURCE_REMOVE
+            })
+            this.#pending.push(search)
             this.#pendingSize += line.length
         })
         try {
@@ -467,13 +477,10 @@ export class SearchHelper {
             this.#stop(`could not send a search to the search helper: ${e.message}`)
         }
 
-        return withTimeout(reply, SEARCH_TIMEOUT_MS)
+        return reply
     }
 
     #start() {
-        if (this.#destroyed)
-            return false
-
         const now = GLib.get_monotonic_time()
         if (this.#lastStart !== null && now - this.#lastStart < RESTART_DELAY_US)
             return false
@@ -489,7 +496,7 @@ export class SearchHelper {
             process = launcher.spawnv(['gjs', '-m', HELPER_PATH, this.#logPrefix])
         } catch (e) {
             console.warn('[%s]', this.#logPrefix,
-                'could not start the search helper:',
+                "could not start the search helper:",
                 e.message)
             return false
         }
@@ -533,7 +540,7 @@ export class SearchHelper {
             const search = this.#pending.shift()
             if (search) {
                 this.#pendingSize -= search.size
-                search.resolve(tryOrNull(() => JSON.parse(line)))
+                this.#settle(search, tryOrNull(() => JSON.parse(line)))
             }
             this.#readReply(process)
         })
@@ -553,7 +560,7 @@ export class SearchHelper {
             console.warn('[%s]', this.#logPrefix, reason)
 
         this.#cancellable?.cancel()
-        tryOrNull(() => this.#stdin?.close(null))
+        this.#stdin?.close(null)
         this.#process?.force_exit()
 
         this.#process = null
@@ -561,8 +568,15 @@ export class SearchHelper {
         this.#stdout = null
         this.#cancellable = null
 
-        for (const {resolve} of this.#pending.splice(0))
-            resolve(null)
+        for (const search of this.#pending.splice(0))
+            this.#settle(search, null)
         this.#pendingSize = 0
+    }
+
+    #settle(search, groups) {
+        if (search.timeoutId !== null)
+            GLib.source_remove(search.timeoutId)
+        search.timeoutId = null
+        search.resolve(groups)
     }
 }

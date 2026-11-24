@@ -7,11 +7,13 @@ import Gio from 'gi://Gio'
 import GLib from 'gi://GLib'
 import GObject from 'gi://GObject'
 import Gtk from 'gi://Gtk'
+
 import {gettext as _} from 'resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js'
 
 import {SESSION, normalizeLanguages} from '../languages.js'
 import {AddLanguageDialog} from './addLanguageDialog.js'
 import {LanguageCatalog, describeLanguage} from './languageCatalog.js'
+
 
 /**
  * The list of the languages the apps are searched in, from the `languages` key

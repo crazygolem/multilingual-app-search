@@ -1,7 +1,3 @@
-// The languages the apps are searched in, as the `languages` key of the
-// extension's settings lists them: in order, each one either a locale name
-// ("de", "pt_BR", "sr@latin") or one of the markers below.
-
 /** The session's language, whose strings the stock search looks up */
 export const SESSION = 'session'
 

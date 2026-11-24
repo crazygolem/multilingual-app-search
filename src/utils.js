@@ -1,31 +1,13 @@
-// Utilities used by the extension.
-
 import Gio from 'gi://Gio'
 import GLib from 'gi://GLib'
 
+
 export function tryOrNull(fn) {
-    try { return fn() }
-    catch { return null }
-}
-
-/**
- * Resolves like `promise`, or with null if it doesn't settle within `ms`
- * milliseconds. The timeout's source is removed as soon as either happens.
- */
-export function withTimeout(promise, ms) {
-    let sourceId = null
-    const timeout = new Promise(resolve => {
-        sourceId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, ms, () => {
-            sourceId = null
-            resolve(null)
-            return GLib.SOURCE_REMOVE
-        })
-    })
-
-    return Promise.race([promise, timeout]).finally(() => {
-        if (sourceId !== null)
-            GLib.source_remove(sourceId)
-    })
+    try {
+        return fn()
+    } catch {
+        return null
+    }
 }
 
 /** Returns the names of the entries of a directory, or none if it doesn't exist. */

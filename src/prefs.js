@@ -1,8 +1,6 @@
-// The extension's preferences window. It runs in the Extensions app's process,
-// not in the shell, and the extension follows the changes while enabled.
-
 import Adw from 'gi://Adw'
 import Gio from 'gi://Gio'
+
 import {ExtensionPreferences, gettext as _} from 'resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js'
 
 import {LanguagesGroup} from './prefs/languagesGroup.js'
