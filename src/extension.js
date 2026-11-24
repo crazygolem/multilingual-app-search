@@ -1,34 +1,41 @@
 import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js'
 
 import {AppProviderPatch} from './appProviderPatch.js'
+import {normalizeLanguages} from './languages.js'
 import {SettingsProviderPatch} from './settingsProviderPatch.js'
 import {ShadowSearch} from './shadowSearch.js'
 
 
 export default class BilingualAppSearch extends Extension {
     #settings
-    #settingsHandlerId
+    #settingsHandlerIds
     #shadowSearch
     #appProviderPatch
     #settingsProviderPatch = null
 
     enable() {
         this.#settings = this.getSettings()
-        this.#shadowSearch = new ShadowSearch(this.uuid)
-        this.#appProviderPatch = new AppProviderPatch(this.#shadowSearch)
 
-        // The Settings panels can be turned on and off in the preferences
-        // while the extension is enabled. GSettings only reports changes to a
-        // key that was read while a handler was connected, so the handler gets
-        // connected first.
-        this.#settingsHandlerId = this.#settings.connect('changed::handle-settings-provider',
-            () => this.#syncSettingsProviderPatch())
+        // The languages and the Settings panels can be changed in the
+        // preferences while the extension is enabled. GSettings only reports
+        // changes to a key that was read while a handler was connected, so the
+        // handlers get connected first.
+        this.#settingsHandlerIds = [
+            this.#settings.connect('changed::languages',
+                () => this.#shadowSearch.setLanguages(this.#languages())),
+            this.#settings.connect('changed::handle-settings-provider',
+                () => this.#syncSettingsProviderPatch()),
+        ]
+
+        this.#shadowSearch = new ShadowSearch(this.uuid, this.#languages())
+        this.#appProviderPatch = new AppProviderPatch(this.#shadowSearch)
         this.#syncSettingsProviderPatch()
     }
 
     disable() {
-        this.#settings.disconnect(this.#settingsHandlerId)
-        this.#settingsHandlerId = null
+        for (const id of this.#settingsHandlerIds)
+            this.#settings.disconnect(id)
+        this.#settingsHandlerIds = null
         this.#settings = null
         this.#settingsProviderPatch?.destroy()
         this.#settingsProviderPatch = null
@@ -36,6 +43,10 @@ export default class BilingualAppSearch extends Extension {
         this.#appProviderPatch = null
         this.#shadowSearch.destroy()
         this.#shadowSearch = null
+    }
+
+    #languages() {
+        return normalizeLanguages(this.#settings.get_strv('languages'))
     }
 
     // Patches Settings' search provider, or undoes the patch, according to the

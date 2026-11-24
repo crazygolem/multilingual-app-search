@@ -1,5 +1,5 @@
 // Makes the app results of the search come from ShadowSearch, so that they
-// match in both languages.
+// match in every language of the preferences.
 //
 // AppSearchProvider is not extensible (i.e. plugins can't provide their own
 // app lists), so it must be monkey-patched. This will conflict with other

@@ -9,8 +9,8 @@
     </key>
     <key name="handle-settings-provider" type="b">
       <default>true</default>
-      <summary>Find Settings panels in both languages</summary>
-      <description>Whether the Settings section of the search results also lists the Settings panels that match in their untranslated strings (usually English), after the ones Settings finds in the session's language. It has no effect when the Shell doesn't search Settings, e.g. when parental controls block the Settings app.</description>
+      <summary>Find Settings panels in every language</summary>
+      <description>Whether the Settings section of the search results also lists the Settings panels that match in the other languages of the "languages" key, after the ones Settings finds in the session's language. It has no effect when the Shell doesn't search Settings, e.g. when parental controls block the Settings app.</description>
     </key>
   </schema>
 </schemalist>

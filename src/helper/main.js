@@ -12,7 +12,7 @@
 // It's started with LANGUAGE=C, so that GLib uses the untranslated strings of
 // the desktop files, and with XDG_DATA_HOME and XDG_DATA_DIRS set so that the
 // only desktop files it sees are the copies kept by ShadowSync, in which those
-// strings hold both languages. GLib monitors these files itself, so
+// strings hold every language searched. GLib monitors these files itself, so
 // changes to them are picked up without a restart.
 
 import Gio from 'gi://Gio'

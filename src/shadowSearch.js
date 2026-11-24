@@ -1,11 +1,11 @@
 // Searches apps with GLib's own search function, the one stock GNOME Shell
-// uses, in both the localized and the untranslated strings of their desktop
-// files.
+// uses, in the strings of their desktop files in several languages: those of
+// the extension's preferences (see languages.js).
 //
 // GLib only searches the strings of the locale it takes from the process'
 // environment, and the shell's environment can't be changed. So the search
 // runs in a separate process (helper/main.js) without a locale, on copies of
-// the desktop files in which each translated string holds both languages.
+// the desktop files in which each translated string holds every language.
 //
 // ShadowSearch is the search itself: ShadowSync keeps the copies in sync with
 // the installed apps, and SearchHelper runs the helper process on them.
@@ -13,6 +13,7 @@
 import Gio from 'gi://Gio'
 import GLib from 'gi://GLib'
 
+import {DEFAULT, SESSION} from './languages.js'
 import {listDir, removeTree, tryOrNull, withTimeout} from './utils.js'
 
 const DESKTOP_GROUP = 'Desktop Entry'
@@ -60,7 +61,7 @@ export function settingsPanelId(desktopId) {
 }
 
 /**
- * Searches the apps in both languages. Its files (the copies, and the data
+ * Searches the apps in several languages. Its files (the copies, and the data
  * directories the helper runs with) are kept in a directory of its own in the
  * user's runtime directory, which destroy() removes.
  */
@@ -72,8 +73,10 @@ export class ShadowSearch {
     /**
      * @param {string} uuid the extension's UUID, which names its directory in
      *   the user's runtime directory and prefixes the messages it logs
+     * @param {string[]} languages the languages to search in, in order (see
+     *   languages.js)
      */
-    constructor(uuid) {
+    constructor(uuid, languages) {
         this.#runtimeDir = makeProcessDir(GLib.build_filenamev([GLib.get_user_runtime_dir(), uuid]))
         const dataDir = GLib.build_filenamev([this.#runtimeDir, 'share'])
         // The helper's only system data directory, so that the copies are the
@@ -81,8 +84,18 @@ export class ShadowSearch {
         const emptyDir = GLib.build_filenamev([this.#runtimeDir, 'empty'])
         GLib.mkdir_with_parents(emptyDir, 0o700)
 
-        this.#shadowSync = new ShadowSync(GLib.build_filenamev([dataDir, 'applications']))
+        this.#shadowSync = new ShadowSync(GLib.build_filenamev([dataDir, 'applications']), languages)
         this.#helper = new SearchHelper({LANGUAGE: 'C', XDG_DATA_HOME: dataDir, XDG_DATA_DIRS: emptyDir}, uuid)
+    }
+
+    /**
+     * Changes the languages to search in. The next searches use them as soon
+     * as the helper has picked up the rewritten copies.
+     *
+     * @param {string[]} languages
+     */
+    setLanguages(languages) {
+        this.#shadowSync.setLanguages(languages)
     }
 
     destroy() {
@@ -95,7 +108,7 @@ export class ShadowSearch {
     }
 
     /**
-     * Resolves with GLib's result groups for the query, in both languages,
+     * Resolves with GLib's result groups for the query, in every language,
      * like Shell.AppSystem.search() returns, or with null if the helper can't
      * answer in time.
      *
@@ -140,29 +153,36 @@ function makeProcessDir(parent) {
 
 /**
  * Returns the contents of a copy of the app's desktop file, keeping only its
- * main group, in which every value that has a translation for the current
- * locale is replaced by "<localized>;<untranslated>". Or null if the app
- * doesn't come from a desktop file that can be read.
+ * main group, in which every value that has translations is replaced by its
+ * values in each of the languages, separated by ";", e.g.
+ * "Fichiers;Files;Dateien". Or null if the app doesn't come from a desktop
+ * file that can be read.
  *
- * The localized value is read in the shell's locale, like stock search does.
- * It comes first so that queries in the localized language rank like with
- * stock search, since GLib also ranks matches by their position in the value.
+ * The values come in the order of the languages, since GLib also ranks matches
+ * by their position in the value: a query that matches equally well in two
+ * languages ranks higher in the first one, and with the session's language
+ * first, queries in it rank like with stock search. A value that's the same in
+ * several languages is only kept in the first one.
+ *
  * Every key gets combined, not only the ones GLib searches, so that this keeps
  * working if GLib starts searching other keys. The keys GLib uses otherwise,
  * like Exec or TryExec, are never translated, and are copied as they are,
  * unless they're in `omittedKeys`.
  *
  * @param {Gio.AppInfo} appInfo
+ * @param {string[]} languages see languages.js
  * @param {string[]} [omittedKeys] keys left out of the copy
  * @returns {?string}
  */
-function combineTranslations(appInfo, omittedKeys = []) {
+function combineTranslations(appInfo, languages, omittedKeys = []) {
     const path = appInfo.get_filename?.()
     if (!path)
         return null
 
     const source = new GLib.KeyFile()
-    if (!tryOrNull(() => source.load_from_file(path, GLib.KeyFileFlags.NONE)))
+    // Without KEEP_TRANSLATIONS, only the strings of the session's languages
+    // are loaded
+    if (!tryOrNull(() => source.load_from_file(path, GLib.KeyFileFlags.KEEP_TRANSLATIONS)))
         return null
 
     if (!source.has_group(DESKTOP_GROUP))
@@ -175,10 +195,12 @@ function combineTranslations(appInfo, omittedKeys = []) {
         if (key.includes('[') || omittedKeys.includes(key))
             continue
 
-        const localized = tryOrNull(() => source.get_locale_string(DESKTOP_GROUP, key, null))
         const untranslated = tryOrNull(() => source.get_string(DESKTOP_GROUP, key))
-        if (localized !== null && untranslated !== null && localized !== untranslated)
-            copy.set_string(DESKTOP_GROUP, key, `${localized};${untranslated}`)
+        const values = new Set(languages.map(language => valueIn(source, key, language)))
+        values.delete(null)
+        const combined = [...values].join(';')
+        if (untranslated !== null && values.size > 0 && combined !== untranslated)
+            copy.set_string(DESKTOP_GROUP, key, combined)
         else
             copy.set_value(DESKTOP_GROUP, key, source.get_value(DESKTOP_GROUP, key))
     }
@@ -187,13 +209,42 @@ function combineTranslations(appInfo, omittedKeys = []) {
 }
 
 /**
+ * Returns the value of a key of the desktop file's main group in one of the
+ * languages (see languages.js), or null if it has none in that language.
+ *
+ * @param {GLib.KeyFile} keyFile loaded with KEEP_TRANSLATIONS
+ * @param {string} key
+ * @param {string} language
+ * @returns {?string}
+ */
+function valueIn(keyFile, key, language) {
+    switch (language) {
+    case SESSION:
+        // Read in the shell's locale, like stock search does: the untranslated
+        // value when there's no translation in it
+        return tryOrNull(() => keyFile.get_locale_string(DESKTOP_GROUP, key, null))
+    case DEFAULT:
+        return tryOrNull(() => keyFile.get_string(DESKTOP_GROUP, key))
+    default:
+        // Only a translation, from the locale or a more general variant of it
+        // (de for de_AT), like GLib looks it up, but without falling back to
+        // the untranslated value: that one is only searched in the session's
+        // language, as stock search does, or as the default language
+        if (keyFile.get_locale_for_key(DESKTOP_GROUP, key, language) === null)
+            return null
+        return tryOrNull(() => keyFile.get_locale_string(DESKTOP_GROUP, key, language))
+    }
+}
+
+/**
  * Keeps an `applications` directory that shadows the installed apps: it holds
- * a copy of the desktop file of each one, with both languages in each
+ * a copy of the desktop file of each one, with every language in each
  * translated value (see combineTranslations), and the copies get updated when
- * apps are installed, removed or changed.
+ * apps are installed, removed or changed, or when the languages change.
  */
 export class ShadowSync {
     #dir
+    #languages
     #written = new Map()
     // Kept, as Gio.AppInfoMonitor.get() returns a new monitor once the
     // previous one is finalized, which would drop the handler
@@ -207,9 +258,12 @@ export class ShadowSync {
 
     /**
      * @param {string} dir the directory where the shadow copies are kept.
+     * @param {string[]} languages the languages of the copies, in order (see
+     *   languages.js)
      */
-    constructor(dir) {
+    constructor(dir, languages) {
         this.#dir = dir
+        this.#languages = languages
         GLib.mkdir_with_parents(dir, 0o700)
 
         this.#monitor = Gio.AppInfoMonitor.get()
@@ -226,6 +280,17 @@ export class ShadowSync {
         this.#monitor = null
         this.#removeAll()
         this.#written = null
+    }
+
+    /**
+     * Rewrites the copies in other languages. Only the copies that change get
+     * written.
+     *
+     * @param {string[]} languages
+     */
+    setLanguages(languages) {
+        this.#languages = languages
+        this.#update()
     }
 
     /**
@@ -286,7 +351,7 @@ export class ShadowSync {
         for (const appInfo of appInfos) {
             const id = appInfo.get_id()
             const isPanel = settingsPanelId(id) !== null && appInfo.get_nodisplay?.()
-            const contents = id ? combineTranslations(appInfo, isPanel ? ['Exec'] : []) : null
+            const contents = id ? combineTranslations(appInfo, this.#languages, isPanel ? ['Exec'] : []) : null
             if (contents !== null)
                 current.set(id, contents)
         }

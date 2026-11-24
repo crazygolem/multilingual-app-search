@@ -1,5 +1,6 @@
 // Patches the Settings search provider so that it also returns the panels that
-// match in the untranslated strings (usually English).
+// match in the other languages of the preferences (by default, the untranslated
+// strings, usually English).
 //
 // The Shell gets the Settings panels from a D-Bus search provider that runs in
 // the gnome-control-center process, and that provider only matches the panels'
@@ -156,7 +157,7 @@ export class SettingsProviderPatch {
 
     /**
      * Resolves with the Settings provider's results, followed by the panels
-     * that only match thanks to their untranslated strings.
+     * that only match thanks to the other languages.
      *
      * @param {object} provider the Settings provider
      * @param {Promise<string[]>} resultsPromise the provider's own results

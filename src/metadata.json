@@ -1,6 +1,6 @@
 {
   "name": "Bilingual App Search",
-  "description": "Make GNOME Search look up applications in both English and your system's locale.",
+  "description": "Make GNOME Search look up applications in several languages.",
   "uuid": "bilingual-app-search@pwa.lu",
   "settings-schema": "org.gnome.shell.extensions.bilingual-app-search",
   "gettext-domain": "bilingual-app-search@pwa.lu",
