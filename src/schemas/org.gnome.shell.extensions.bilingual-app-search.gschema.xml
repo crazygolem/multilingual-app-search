@@ -2,6 +2,11 @@
 <schemalist>
   <schema id="org.gnome.shell.extensions.bilingual-app-search"
           path="/org/gnome/shell/extensions/bilingual-app-search/">
+    <key name="languages" type="as">
+      <default>['session', 'default']</default>
+      <summary>Languages to search apps in</summary>
+      <description>The languages whose strings of the apps' desktop files are searched, in order: when a query matches equally well in two languages, the one that comes first ranks higher. "session" is the session's language, and is always searched: it's put first if it's missing. "default" is the apps' default language (usually English): their strings without a locale. Any other entry is a locale name, like "de" or "pt_BR".</description>
+    </key>
     <key name="handle-settings-provider" type="b">
       <default>true</default>
       <summary>Find Settings panels in both languages</summary>

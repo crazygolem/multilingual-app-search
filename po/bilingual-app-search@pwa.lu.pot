@@ -2,18 +2,101 @@ msgid ""
 msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 
-#: src/prefs.js:11
+#: src/prefs/addLanguageDialog.js:46
+msgid "Add Language"
+msgstr ""
+
+#: src/prefs/addLanguageDialog.js:50
+msgid "Search languages"
+msgstr ""
+
+#: src/prefs/addLanguageDialog.js:66
+msgid "No languages found"
+msgstr ""
+
+#: src/prefs/addLanguageDialog.js:91 src/prefs/addLanguageDialog.js:93
+msgid "More Languages"
+msgstr ""
+
+#: src/prefs/addLanguageDialog.js:147
+#, javascript-format
+msgid "%d app"
+msgid_plural "%d apps"
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/prefs/addLanguageDialog.js:147
+msgid "No apps"
+msgstr ""
+
+#: src/prefs.js:15
 msgid "Other Results"
 msgstr ""
 
 #. Translators: "Settings" is the name of the Settings app, whose
 #. panels are Wi-Fi, Bluetooth, Displays, ...
-#: src/prefs.js:16
+#: src/prefs.js:20
 msgid "Settings"
 msgstr ""
 
-#: src/prefs.js:17
+#: src/prefs.js:21
 msgid ""
 "Augment search results from the Settings application, finding extra panels "
 "by their name and keywords."
+msgstr ""
+
+#: src/prefs/languageCatalog.js:157
+msgid "Session Language"
+msgstr ""
+
+#: src/prefs/languageCatalog.js:160
+msgid "Default Language"
+msgstr ""
+
+#: src/prefs/languageCatalog.js:160
+msgid "Original language of the apps, usually English"
+msgstr ""
+
+#. Translators: the numbers of apps that have strings in the
+#. language, and of apps installed. The plural form is chosen
+#. by the first one.
+#: src/prefs/languageCatalog.js:169
+#, javascript-format
+msgid "In %d of %d apps"
+msgid_plural "In %d of %d apps"
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/prefs/languageCatalog.js:170
+msgid "Not in any installed app yet"
+msgstr ""
+
+#: src/prefs/languagesGroup.js:39
+msgid "Languages"
+msgstr ""
+
+#: src/prefs/languagesGroup.js:40
+msgid ""
+"When a query matches equally well in several languages, the one higher in "
+"the list ranks first."
+msgstr ""
+
+#: src/prefs/languagesGroup.js:146
+msgid "Move Up"
+msgstr ""
+
+#: src/prefs/languagesGroup.js:147
+msgid "Move Down"
+msgstr ""
+
+#: src/prefs/languagesGroup.js:150
+msgid "Remove"
+msgstr ""
+
+#: src/prefs/languagesGroup.js:156
+msgid "More Options"
+msgstr ""
+
+#: src/prefs/languagesGroup.js:203
+msgid "Add Language…"
 msgstr ""

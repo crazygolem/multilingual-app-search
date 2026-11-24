@@ -2,18 +2,46 @@ msgid ""
 msgstr ""
 "Language: fr\n"
 "Content-Type: text/plain; charset=UTF-8\n"
+"Plural-Forms: nplurals=2; plural=(n > 1);\n"
 
-#: src/prefs.js:11
+#: src/prefs/addLanguageDialog.js:46
+msgid "Add Language"
+msgstr "Ajouter une langue"
+
+#: src/prefs/addLanguageDialog.js:50
+msgid "Search languages"
+msgstr "Rechercher des langues"
+
+#: src/prefs/addLanguageDialog.js:66
+msgid "No languages found"
+msgstr "Aucune langue trouvée"
+
+#: src/prefs/addLanguageDialog.js:91 src/prefs/addLanguageDialog.js:93
+msgid "More Languages"
+msgstr "Plus de langues"
+
+#: src/prefs/addLanguageDialog.js:147
+#, javascript-format
+msgid "%d app"
+msgid_plural "%d apps"
+msgstr[0] "%d application"
+msgstr[1] "%d applications"
+
+#: src/prefs/addLanguageDialog.js:147
+msgid "No apps"
+msgstr "Aucune application"
+
+#: src/prefs.js:15
 msgid "Other Results"
 msgstr "Autres résultats"
 
 #. Translators: "Settings" is the name of the Settings app, whose
 #. panels are Wi-Fi, Bluetooth, Displays, ...
-#: src/prefs.js:16
+#: src/prefs.js:20
 msgid "Settings"
 msgstr "Paramètres"
 
-#: src/prefs.js:17
+#: src/prefs.js:21
 msgid ""
 "Augment search results from the Settings application, finding extra panels "
 "by their name and keywords."
@@ -21,3 +49,60 @@ msgstr ""
 "Enrichir les résultats de recherche de l’application Paramètres, en trouvant "
 "les panneaux additionnels par leurs nom et mots-clefs."
 
+#: src/prefs/languageCatalog.js:157
+msgid "Session Language"
+msgstr "Langue de la session"
+
+#: src/prefs/languageCatalog.js:160
+msgid "Default Language"
+msgstr "Langue par défaut"
+
+#: src/prefs/languageCatalog.js:160
+msgid "Original language of the apps, usually English"
+msgstr "Langue d’origine des applications, en général l’anglais"
+
+#. Translators: the numbers of apps that have strings in the
+#. language, and of apps installed. The plural form is chosen
+#. by the first one.
+#: src/prefs/languageCatalog.js:169
+#, javascript-format
+msgid "In %d of %d apps"
+msgid_plural "In %d of %d apps"
+msgstr[0] "Dans %d application sur %d"
+msgstr[1] "Dans %d applications sur %d"
+
+#: src/prefs/languageCatalog.js:170
+msgid "Not in any installed app yet"
+msgstr "Dans aucune application installée pour l’instant"
+
+#: src/prefs/languagesGroup.js:39
+msgid "Languages"
+msgstr "Langues"
+
+#: src/prefs/languagesGroup.js:40
+msgid ""
+"When a query matches equally well in several languages, the one higher in "
+"the list ranks first."
+msgstr ""
+"Quand une recherche correspond aussi bien dans plusieurs langues, la langue "
+"la plus haut placée dans la liste l’emporte."
+
+#: src/prefs/languagesGroup.js:146
+msgid "Move Up"
+msgstr "Déplacer vers le haut"
+
+#: src/prefs/languagesGroup.js:147
+msgid "Move Down"
+msgstr "Déplacer vers le bas"
+
+#: src/prefs/languagesGroup.js:150
+msgid "Remove"
+msgstr "Retirer"
+
+#: src/prefs/languagesGroup.js:156
+msgid "More Options"
+msgstr "Plus d’options"
+
+#: src/prefs/languagesGroup.js:203
+msgid "Add Language…"
+msgstr "Ajouter une langue…"
