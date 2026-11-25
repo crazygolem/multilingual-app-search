@@ -236,7 +236,11 @@ export class SettingsProviderPatch {
             if (metas.length === 0)
                 return ids.filter(id => this.#known.get(id))
 
-            const metaIds = new Set(metas.map(meta => meta.id))
+            // Before GNOME 49, the provider gives each meta the panel's
+            // desktop ID instead of the result's ID (which the Shell then
+            // activates it with)
+            // cf. https://gitlab.gnome.org/GNOME/gnome-control-center/-/blob/48.7/search-provider/cc-search-provider.c#L225
+            const metaIds = new Set(metas.map(meta => settingsPanelId(meta.id) ?? meta.id))
             for (const id of unchecked)
                 this.#known.set(id, metaIds.has(id))
         }
